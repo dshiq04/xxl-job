@@ -1,18 +1,18 @@
 # base image
-FROM openjdk:21-jdk-slim
+FROM eclipse-temurin:25-jre-jammy
 
 # maintainer
 MAINTAINER xuxueli
 
 # set params
-ENV PARAMS=""
+ENV PARAMS="--spring.profiles.active=prod"
 
 # set timezone
 ENV TZ=PRC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
 # copy jar
-ADD target/xxl-job-admin-*.jar /app.jar
+ADD target/xxl-job-admin-3.4.0-SNAPSHOT.jar /app.jar
 
 # command
 # log home: -e LOG_HOME=/data/applogs

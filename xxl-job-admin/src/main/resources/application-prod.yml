@@ -1,9 +1,9 @@
 xxl-job:
   database:
     type: postgresql
-    host: 127.0.0.1
-    port: 5432
-    username: postgres
-    password: tomori
-    database: xxl_job
+    host: ${DB_HOST}
+    port: ${DB_PORT}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    database: ${DB_DATABASE}
     driver-class-name: org.postgresql.Driver
