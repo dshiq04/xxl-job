@@ -16,7 +16,7 @@ services:
       - DB_PASSWORD=tomori
       - DB_DATABASE=xxl_job
     ports:
-      - "8080:8080"
+      - "8077:8080"
     # 加入自定义网络
     networks:
       - dshiq04
