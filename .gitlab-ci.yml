@@ -1,21 +1,20 @@
 # =============================================================================
-# XXL-JOB —— GitLab CI/CD（同时兼容 shell executor 与 docker executor）
+# XXL-JOB —— GitLab CI/CD（纯 docker 命令，不依赖 docker compose）
 #
-# 流程：docker build（多阶段，Maven 在容器内打包）-> docker compose 发布
+# 流程：docker build（多阶段构建，Maven 在镜像内打包）-> docker run 发布
 #
-# 前置条件（Runner 所在宿主机 / job 容器内都要满足）：
-#   - 有 docker 命令，并且能连到「部署目标」的 Docker 守护进程
-#   - docker executor：config.toml 必须挂载 socket，否则 job 里没有 docker：
+# 前置条件：
+#   - Runner 为 docker executor，且已挂载 /var/run/docker.sock：
 #       [runners.docker]
 #         image = "docker:27-cli"
 #         privileged = false
 #         volumes = ["/var/run/docker.sock:/var/run/docker.sock", "/cache"]
-#   - shell executor：宿主机装 git + docker + compose 插件，
-#     且 runner 用户已加入 docker 组
+#   - 宿主机 docker 已配置 registry-mirrors（加速基础镜像拉取）
 #   - 已存在的自定义网络（CI 会自动创建）
 #
-# 可在 GitLab CI/CD Variables 覆盖：DB_HOST DB_PORT DB_USER DB_PASSWORD
-#   DB_DATABASE SERVER_PORT(默认 8077) DOCKER_NETWORK(默认 dshiq04)
+# 可在 GitLab CI/CD Variables 覆盖：
+#   DB_HOST DB_PORT DB_USER DB_PASSWORD DB_DATABASE SERVER_PORT
+#   DOCKER_NETWORK CONTAINER_NAME LOG_VOLUME JAVA_OPTS
 # =============================================================================
 
 workflow:
@@ -31,16 +30,18 @@ stages:
   - deploy
 
 variables:
-  # job 容器内指向宿主机 Docker（shell executor 下该默认值同样正确）
+  # 指向宿主机 Docker 守护进程（runner 挂载了 docker.sock）
   DOCKER_HOST: "unix:///var/run/docker.sock"
   DOCKER_TLS_CERTDIR: ""
   DOCKER_BUILDKIT: "1"
-  # 调度中心镜像名（本机使用，不推镜像仓库）
+  # 镜像 / 容器 / 网络
   ADMIN_IMAGE: "xxl-job-admin"
-  # 与 docker-compose.yml 保持一致的部署参数
+  CONTAINER_NAME: "xxl-job"
   DOCKER_NETWORK: "dshiq04"
+  LOG_VOLUME: "xxl-job-logs"
+  # 端口：宿主机端口 -> 容器内端口
   SERVER_PORT: "8077"
-  COMPOSE_PROJECT_NAME: "xxl-job"
+  APP_PORT: "8080"
   # 健康检查用的临时容器
   CURL_IMAGE: "curlimages/curl:8.10.1"
 
@@ -50,7 +51,6 @@ default:
 # ------------------------------------------------------------------ 构建镜像 --
 build-image:
   stage: build
-  # docker executor 下使用该镜像；shell executor 下忽略此配置
   image: docker:27-cli
   script:
     - docker version
@@ -59,7 +59,7 @@ build-image:
       docker image inspect "$ADMIN_IMAGE:$CI_COMMIT_SHORT_SHA" \
         --format '>>> 镜像构建完成 {{.Id}} size={{.Size}}'
 
-# ------------------------------------------------------------------ 部署本机 --
+# ------------------------------------------------------------------ 发布容器 --
 deploy-admin:
   stage: deploy
   image: docker:27-cli
@@ -74,42 +74,51 @@ deploy-admin:
     - when: manual
       allow_failure: true
   script:
-    # 0) 环境自检（镜像在上一阶段已构建在同一 Docker 守护进程上）
+    # 0) 环境自检
     - |
       command -v docker >/dev/null 2>&1 || { echo "job 内没有 docker 命令：docker executor 需挂载 /var/run/docker.sock"; exit 1; }
-      docker info >/dev/null 2>&1 || { echo "无法连接 Docker 守护进程（检查 socket 挂载 / runner 用户 docker 组）"; exit 1; }
-      DC="docker compose"
-      $DC version >/dev/null 2>&1 || DC="docker-compose"
-      $DC version >/dev/null 2>&1 || { echo "未安装 docker compose 插件"; exit 1; }
+      docker info >/dev/null 2>&1 || { echo "无法连接 Docker 守护进程"; exit 1; }
       docker image inspect "$ADMIN_IMAGE:latest" >/dev/null 2>&1 || docker build -t "$ADMIN_IMAGE:latest" .
 
-    # 1) 确保自定义网络存在（compose 中声明为 external）
+    # 1) 网络（不存在则创建）
     - |
       if ! docker network inspect "$DOCKER_NETWORK" >/dev/null 2>&1; then
         echo ">>> 创建 docker 网络: $DOCKER_NETWORK"
-        docker network create "$DOCKER_NETWORK"
+        docker network create "$DOCKER_NETWORK" >/dev/null
       fi
 
-    # 2) 备份当前运行镜像，便于失败回滚
+    # 2) 备份当前版本镜像用于回滚
     - |
-      if docker image inspect "$ADMIN_IMAGE:previous" >/dev/null 2>&1; then
-        docker image rm "$ADMIN_IMAGE:previous" >/dev/null 2>&1 || true
-      fi
-      if docker ps --format '{{.Image}}' | grep -qx "$ADMIN_IMAGE:latest"; then
+      docker image rm "$ADMIN_IMAGE:previous" >/dev/null 2>&1 || true
+      if docker image inspect "$ADMIN_IMAGE:latest" >/dev/null 2>&1; then
         docker tag "$ADMIN_IMAGE:latest" "$ADMIN_IMAGE:previous"
-        echo ">>> 已备份上一版本镜像: $ADMIN_IMAGE:previous"
+        echo ">>> 已备份上一版本: $ADMIN_IMAGE:previous"
       fi
 
-    # 3) 发布：--no-build 复用刚构建的镜像；--force-recreate 保证新版本生效
+    # 3) 启动容器（函数封装，回滚时复用同一套参数）
     - |
-      set -e
-      DC="docker compose"
-      $DC version >/dev/null 2>&1 || DC="docker-compose"
-      export XXL_JOB_ADMIN_IMAGE="$ADMIN_IMAGE:latest"
-      export SERVER_PORT="${SERVER_PORT:-8077}"
-      $DC up -d --no-build --force-recreate --remove-orphans
+      start_app() {
+        docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+        docker run -d --name "$CONTAINER_NAME" \
+          --restart unless-stopped \
+          --network "$DOCKER_NETWORK" \
+          -e TZ=Asia/Shanghai \
+          -e DB_HOST="${DB_HOST:-postgres}" \
+          -e DB_PORT="${DB_PORT:-5432}" \
+          -e DB_USER="${DB_USER:-postgres}" \
+          -e DB_PASSWORD="${DB_PASSWORD:-tomori}" \
+          -e DB_DATABASE="${DB_DATABASE:-xxl_job}" \
+          -e JAVA_OPTS="${JAVA_OPTS:--Xms256m -Xmx512m}" \
+          -e LOG_HOME=/data/applogs \
+          -p "${SERVER_PORT:-8077}:${APP_PORT:-8080}" \
+          -v "${LOG_VOLUME}:/data/applogs" \
+          "$1" >/dev/null
+        echo ">>> 容器已启动: $CONTAINER_NAME 镜像=$1 端口=${SERVER_PORT:-8077}"
+      }
 
-    # 4) 健康检查（compose 网络内访问 actuator），失败自动回滚
+      start_app "$ADMIN_IMAGE:latest"
+
+    # 4) 健康检查，失败自动回滚到上一版本镜像
     - |
       set +e
       docker image inspect "$CURL_IMAGE" >/dev/null 2>&1 || docker pull "$CURL_IMAGE" >/dev/null 2>&1
@@ -120,29 +129,27 @@ deploy-admin:
       for i in $(seq 1 30); do
         if [ "$HAS_CURL" = "1" ]; then
           if docker run --rm --network "$DOCKER_NETWORK" "$CURL_IMAGE" -fsS \
-               "http://xxl-job:8080/xxl-job-admin/actuator/health" 2>/dev/null \
+               "http://${CONTAINER_NAME}:${APP_PORT:-8080}/xxl-job-admin/actuator/health" 2>/dev/null \
                | grep -q '"status":"UP"'; then ok=1; break; fi
         else
-          # 无法拉取 curl 镜像时降级为容器运行状态检查
-          if [ "$(docker inspect -f '{{.State.Running}}' xxl-job 2>/dev/null)" = "true" ]; then ok=1; break; fi
+          if [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null)" = "true" ]; then ok=1; break; fi
         fi
         sleep 3
       done
 
       if [ "$ok" != "1" ]; then
-        echo ">>> 健康检查失败，容器日志如下（最后 100 行）："
-        docker logs --tail 100 xxl-job 2>&1 || true
+        echo ">>> 健康检查失败，容器日志（最后 100 行）:"
+        docker logs --tail 100 "$CONTAINER_NAME" 2>&1 || true
         if docker image inspect "$ADMIN_IMAGE:previous" >/dev/null 2>&1; then
-          echo ">>> 回滚到上一版本镜像 $ADMIN_IMAGE:previous"
-          DC="docker compose"
-          $DC version >/dev/null 2>&1 || DC="docker-compose"
-          docker tag "$ADMIN_IMAGE:previous" "$ADMIN_IMAGE:latest"
-          $DC up -d --no-build --force-recreate --remove-orphans
+          echo ">>> 回滚到 $ADMIN_IMAGE:previous"
+          start_app "$ADMIN_IMAGE:previous"
         fi
         exit 1
       fi
       echo ">>> 健康检查通过，部署成功"
 
     # 5) 输出状态并清理悬空镜像
-    - docker ps --filter "name=xxl-job" --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
-    - docker image prune -f >/dev/null || true
+    - |
+      docker ps --filter "name=${CONTAINER_NAME}" \
+        --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
+      docker image prune -f >/dev/null || true
