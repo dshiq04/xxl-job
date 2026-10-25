@@ -24,7 +24,7 @@ variables:
   IMAGE_NAME: xxl-job:2.4.1
   CONTAINER_NAME: xxl-job
   NETWORK_NAME: dshiq04
-  HOST_PORT: "8080"
+  HOST_PORT: "8077"
 
   DB_HOST: postgres
   DB_PORT: 5432
@@ -66,14 +66,15 @@ deploy-xxl-job:
       echo ">>> [4/4] run container: ${CONTAINER_NAME}"
       docker run -d \
         --name "${CONTAINER_NAME}" \
-        --restart unless-stopped \
         --network "${NETWORK_NAME}" \
         -p "${HOST_PORT}:8080" \
         -e TZ=Asia/Shanghai \
         -e SPRING_PROFILES_ACTIVE=prod \
-        -e DB_URL="${DB_URL}" \
+        -e DB_HOST="${DB_HOST}" \
+        -e DB_PORT="${DB_PORT}" \
         -e DB_USERNAME="${DB_USERNAME}" \
         -e DB_PASSWORD="${DB_PASSWORD}" \
+        -e DB_DATABASE="${DB_DATABASE}" \
         -e XXL_JOB_ACCESS_TOKEN="${XXL_JOB_ACCESS_TOKEN}" \
         "${IMAGE_NAME}"
 
