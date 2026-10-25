@@ -40,10 +40,10 @@ spring:
 
   ### xxl-job, datasource (parameters are injected by environment / JVM args)
   datasource:
-    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
-    username: ${DB_USERNAME}
-    password: ${DB_PASSWORD}
-    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${xxl-job.database.host}:${xxl-job.database.port}/${xxl-job.database.database}
+    username: ${xxl-job.database.username}
+    password: ${xxl-job.database.password}
+    driver-class-name: ${xxl-job.database.driver-class-name}
 
     ### datasource-pool
     type: com.zaxxer.hikari.HikariDataSource

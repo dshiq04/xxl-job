@@ -1,14 +1,9 @@
-### prod environment
-spring:
-  datasource:
-    url: ${DB_URL}
-    username: ${DB_USERNAME}
+xxl-job:
+  database:
+    type: postgresql
+    host: ${DB_HOST}
+    port: ${DB_PORT}
+    username: ${DB_USER}
     password: ${DB_PASSWORD}
+    database: ${DB_DATABASE}
     driver-class-name: org.postgresql.Driver
-
-server:
-  port: ${SERVER_PORT:8080}
-
-logging:
-  level:
-    root: ${LOG_LEVEL_ROOT:info}

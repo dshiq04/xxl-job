@@ -1,0 +1,83 @@
+# -----------------------------------------------------------------------------
+# GitLab CI deployment for xxl-job-admin (PostgreSQL / prod profile)
+#
+# Environment:
+#   GitLab:        192.168.150.10, docker network "dshiq04",
+#                  ports 7080(HTTP), 7443(HTTPS), 7022(SSH)
+#   GitLab Runner: docker network "dshiq04",
+#                  /var/run/docker.sock mounted into the runner container
+#
+# The runner uses the host Docker daemon. This pipeline only manages the
+# xxl-job container/image. It does not create GitLab or GitLab Runner
+# containers again.
+#
+# Recommended: override DB_PASSWORD and XXL_JOB_ACCESS_TOKEN in
+# GitLab > Settings > CI/CD > Variables (masked + protected).
+# -----------------------------------------------------------------------------
+
+stages:
+  - deploy
+
+variables:
+  DOCKER_HOST: unix:///var/run/docker.sock
+
+  IMAGE_NAME: xxl-job:2.4.1
+  CONTAINER_NAME: xxl-job
+  NETWORK_NAME: dshiq04
+  HOST_PORT: "8080"
+
+  DB_HOST: postgres
+  DB_PORT: 5432
+  DB_USERNAME: postgres
+  DB_PASSWORD: tomori
+  DB_DATABASE: xxl_job_admin
+  XXL_JOB_ACCESS_TOKEN: default_token
+
+deploy-xxl-job:
+  stage: deploy
+  image: docker:27-cli
+
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+
+  before_script:
+    - docker version
+    - docker info >/dev/null
+
+  script:
+    - |
+      echo ">>> [1/4] remove old container: ${CONTAINER_NAME}"
+      if docker container inspect "${CONTAINER_NAME}" >/dev/null 2>&1; then
+        docker rm -f "${CONTAINER_NAME}"
+      else
+        echo "container not found, skip"
+      fi
+
+    - |
+      echo ">>> [2/4] remove old image: ${IMAGE_NAME}"
+      if docker image inspect "${IMAGE_NAME}" >/dev/null 2>&1; then
+        docker rmi -f "${IMAGE_NAME}"
+      else
+        echo "image not found, skip"
+      fi
+
+    - |
+      echo ">>> [3/4] build image: ${IMAGE_NAME}"
+      docker build -t "${IMAGE_NAME}" -f xxl-job-admin/Dockerfile .
+
+    - |
+      echo ">>> [4/4] run container: ${CONTAINER_NAME}"
+      docker run -d \
+        --name "${CONTAINER_NAME}" \
+        --restart unless-stopped \
+        --network "${NETWORK_NAME}" \
+        -p "${HOST_PORT}:8080" \
+        -e TZ=Asia/Shanghai \
+        -e SPRING_PROFILES_ACTIVE=prod \
+        -e DB_URL="${DB_URL}" \
+        -e DB_USERNAME="${DB_USERNAME}" \
+        -e DB_PASSWORD="${DB_PASSWORD}" \
+        -e XXL_JOB_ACCESS_TOKEN="${XXL_JOB_ACCESS_TOKEN}" \
+        "${IMAGE_NAME}"
+
+    - docker ps --filter "name=${CONTAINER_NAME}" --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"

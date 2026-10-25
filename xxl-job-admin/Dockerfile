@@ -1,5 +1,5 @@
 # ---------- build stage ----------
-FROM maven:3.9-eclipse-temurin-17 AS builder
+FROM maven:3.9-eclipse-temurin-17-alpine AS builder
 WORKDIR /build
 
 COPY pom.xml ./
@@ -9,7 +9,7 @@ COPY xxl-job-admin ./xxl-job-admin
 RUN mvn -B -DskipTests clean package
 
 # ---------- runtime stage ----------
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:17-jre-alpine
 
 MAINTAINER xuxueli
 
