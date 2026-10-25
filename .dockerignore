@@ -1,0 +1,9 @@
+.git
+.gitignore
+.idea
+**/target
+xxl-job-admin-web
+deploy
+run.out
+run.err
+*.iml

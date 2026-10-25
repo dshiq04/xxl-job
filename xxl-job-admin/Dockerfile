@@ -1,11 +1,25 @@
-FROM openjdk:8-jre-slim
+# ---------- build stage ----------
+FROM maven:3.9-eclipse-temurin-17 AS builder
+WORKDIR /build
+
+COPY pom.xml ./
+COPY xxl-job-core ./xxl-job-core
+COPY xxl-job-admin ./xxl-job-admin
+
+RUN mvn -B -DskipTests clean package
+
+# ---------- runtime stage ----------
+FROM eclipse-temurin:17-jre
+
 MAINTAINER xuxueli
 
 ENV PARAMS=""
+ENV TZ=Asia/Shanghai
 
-ENV TZ=PRC
 RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
 
-ADD target/xxl-job-admin-*.jar /app.jar
+COPY --from=builder /build/xxl-job-admin/target/xxl-job-admin-*.jar /app.jar
 
-ENTRYPOINT ["sh","-c","java -jar $JAVA_OPTS /app.jar $PARAMS"]
+EXPOSE 8080
+
+ENTRYPOINT ["sh","-c","java $JAVA_OPTS -jar /app.jar $PARAMS"]

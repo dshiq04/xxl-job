@@ -1,0 +1,97 @@
+### web
+server:
+  port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: ${SERVER_CONTEXT_PATH:/xxl-job-admin}
+
+### actuator
+management:
+  server:
+    base-path: /actuator
+  health:
+    mail:
+      enabled: false
+
+### spring
+spring:
+  application:
+    name: xxl-job-admin
+  profiles:
+    active: dev
+
+  ### resources
+  mvc:
+    servlet:
+      load-on-startup: 0
+    static-path-pattern: /static/**
+  web:
+    resources:
+      static-locations: classpath:/static/
+
+  ### freemarker
+  freemarker:
+    template-loader-path: classpath:/templates/
+    suffix: .ftl
+    charset: UTF-8
+    request-context-attribute: request
+    settings:
+      number_format: 0.##########
+      new_builtin_class_resolver: safer
+
+  ### xxl-job, datasource (parameters are injected by environment / JVM args)
+  datasource:
+    url: jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+    ### datasource-pool
+    type: com.zaxxer.hikari.HikariDataSource
+    hikari:
+      minimum-idle: 10
+      maximum-pool-size: 30
+      auto-commit: true
+      idle-timeout: 30000
+      pool-name: HikariCP
+      max-lifetime: 900000
+      connection-timeout: 10000
+      connection-test-query: SELECT 1
+      validation-timeout: 1000
+
+  ### xxl-job, email
+  mail:
+    host: ${MAIL_HOST:smtp.qq.com}
+    port: ${MAIL_PORT:25}
+    username: ${MAIL_USERNAME:xxx@qq.com}
+    password: ${MAIL_PASSWORD:xxx}
+    from: ${MAIL_FROM:xxx@qq.com}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          socketFactory:
+            class: javax.net.ssl.SSLSocketFactory
+
+### mybatis
+mybatis:
+  mapper-locations: classpath:/mybatis-mapper/*Mapper.xml
+
+### xxl-job, access token
+xxl:
+  job:
+    accessToken: ${XXL_JOB_ACCESS_TOKEN:default_token}
+    i18n: ${XXL_JOB_I18N:zh_CN}
+    triggerpool:
+      fast:
+        max: ${XXL_JOB_TRIGGERPOOL_FAST_MAX:200}
+      slow:
+        max: ${XXL_JOB_TRIGGERPOOL_SLOW_MAX:100}
+    logretentiondays: ${XXL_JOB_LOGRETENTIONDAYS:30}
+
+### logging
+logging:
+  level:
+    root: ${LOG_LEVEL_ROOT:info}

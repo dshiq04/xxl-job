@@ -1,0 +1,11 @@
+### dev environment
+spring:
+  datasource:
+    url: jdbc:postgresql://192.168.150.10:5432/xxl_job_admin
+    username: postgres
+    password: tomori
+    driver-class-name: org.postgresql.Driver
+
+logging:
+  level:
+    com.xxl.job: debug

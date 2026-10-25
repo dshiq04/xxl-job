@@ -81,6 +81,12 @@
 
           	<div class="navbar-custom-menu">
 				<ul class="nav navbar-nav">
+					<#-- new UI entry -->
+					<li>
+						<a href="${request.contextPath}/static/new-ui/index.html" title="进入新版界面">
+							<i class="fa fa-desktop"></i> 进入新版
+						</a>
+					</li>
 					<#-- login user -->
                     <li class="dropdown">
                         <a href="javascript:" class="dropdown-toggle" data-toggle="dropdown" aria-expanded="false">

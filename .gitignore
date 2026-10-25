@@ -5,3 +5,7 @@
 target/
 .DS_Store
 .gitattributes
+
+node_modules/
+run.out
+run.err

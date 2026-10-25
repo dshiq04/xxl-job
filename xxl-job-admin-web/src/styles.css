@@ -1,0 +1,650 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial,
+    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  background: #f4f6f9;
+  color: #333;
+}
+
+/* ---------- custom scrollbar (6px, gray -> blue on hover) ---------- */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #c0c4cc transparent;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #c0c4cc;
+  border-radius: 6px;
+  transition: background-color 0.25s ease;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #1677ff;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.page-loading {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ---------- login ---------- */
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1e3c72 0%, #2a5298 55%, #3c8dbc 100%);
+  padding: 24px;
+}
+
+.login-card {
+  width: 400px;
+  max-width: 100%;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+  padding: 34px 34px 26px;
+}
+
+.login-logo {
+  text-align: center;
+  margin-bottom: 6px;
+  font-size: 30px;
+  font-weight: 700;
+  color: #3c8dbc;
+  letter-spacing: 1px;
+}
+
+.login-logo b {
+  color: #333;
+}
+
+.login-subtitle {
+  text-align: center;
+  color: #888;
+  font-size: 13px;
+  margin-bottom: 26px;
+}
+
+.login-footer {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+/* ---------- app layout ---------- */
+.app-logo {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  background: rgba(0, 0, 0, 0.18);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.app-logo span {
+  color: #4fc3f7;
+}
+
+.app-header {
+  background: #fff !important;
+  padding: 0 18px !important;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 1px 4px rgba(0, 21, 41, 0.08);
+  height: 56px;
+  line-height: 56px;
+}
+
+.app-header-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.app-header-right {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.app-content {
+  padding: 20px;
+  min-height: calc(100vh - 56px);
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.app-footer {
+  text-align: center;
+  color: #999;
+  font-size: 12px;
+  padding: 12px 0 16px;
+}
+
+/* ---------- page ---------- */
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.page-header h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+}
+
+.page-header .page-header-tip {
+  margin-left: 10px;
+  font-size: 12px;
+  color: #999;
+  font-weight: 400;
+}
+
+.filter-card {
+  margin-bottom: 16px;
+}
+
+.filter-card .ant-form-item {
+  margin-bottom: 0;
+}
+
+/* ---------- dashboard ---------- */
+.stat-card {
+  border-radius: 6px;
+  color: #fff;
+  padding: 20px 22px;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  min-height: 110px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.stat-card.aqua {
+  background: #00c0ef;
+}
+
+.stat-card.yellow {
+  background: #f39c12;
+}
+
+.stat-card.green {
+  background: #00a65a;
+}
+
+.stat-card-icon {
+  font-size: 40px;
+  opacity: 0.85;
+}
+
+.stat-card .ant-statistic-title {
+  color: rgba(255, 255, 255, 0.88);
+  font-size: 13px;
+  margin-bottom: 2px;
+}
+
+.stat-card .ant-statistic-content {
+  color: #fff;
+  font-size: 26px;
+  font-weight: 600;
+}
+
+.stat-card-desc {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  margin-top: 4px;
+}
+
+.chart-box {
+  height: 340px;
+  width: 100%;
+}
+
+.dashboard-report-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.dashboard-report-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #333;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.dashboard-report-header .dashboard-report-controls {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.dashboard-report-header .dashboard-report-controls .ant-picker {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
+.dashboard-report-header .dashboard-report-controls .ant-btn {
+  width: 100%;
+}
+
+/* ---------- table misc ---------- */
+.table-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.code-preview {
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 12px;
+  border-radius: 4px;
+  max-height: 58vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: Consolas, Monaco, 'Courier New', monospace;
+  font-size: 12px;
+  margin: 0;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.table-subtext {
+  font-size: 12px;
+  color: #999;
+  margin-top: 2px;
+}
+
+.log-success {
+  color: #00a65a;
+}
+
+.log-fail {
+  color: #dd4b39;
+}
+
+.log-empty {
+  color: #999;
+}
+
+.job-tips {
+  max-width: 320px;
+  line-height: 1.8;
+  color: #333;
+  word-break: break-all;
+}
+
+.log-msg-content {
+  max-height: 60vh;
+  overflow: auto;
+  line-height: 1.75;
+  color: #333;
+  word-break: break-all;
+}
+
+.log-msg-content img {
+  max-width: 100%;
+}
+
+/* ---------- responsive layout ---------- */
+.app-header-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.app-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #333;
+  white-space: nowrap;
+}
+
+.app-user-name {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 991px) {
+  .app-content {
+    padding: 14px;
+  }
+
+  .app-header {
+    padding: 0 12px !important;
+  }
+
+  .app-header-right {
+    gap: 10px;
+  }
+
+  .page-header h2 {
+    font-size: 18px;
+  }
+
+  .filter-card .ant-form-inline {
+    display: flex;
+    flex-wrap: wrap;
+    row-gap: 10px;
+  }
+
+  .filter-card .ant-form-item {
+    margin-inline-end: 12px;
+    margin-bottom: 0;
+  }
+
+  .log-filters {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .log-filters > span {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+  }
+
+  .log-filters .ant-select,
+  .log-filters .ant-picker {
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 576px) {
+  .app-content {
+    padding: 10px;
+  }
+
+  .app-header-title {
+    font-size: 15px;
+  }
+
+  .app-footer {
+    padding: 8px 0 12px;
+  }
+
+  .ant-card-body {
+    padding: 12px;
+  }
+
+  .page-header {
+    margin-bottom: 12px;
+  }
+
+  .filter-card .ant-form-inline {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-card .ant-form-item {
+    width: 100%;
+    margin-inline-end: 0;
+  }
+
+  .filter-card .ant-form-item-row {
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+  }
+
+  .filter-card .ant-form-item-label {
+    text-align: left;
+    padding-bottom: 4px;
+  }
+
+  .filter-card .ant-form-item-label > label {
+    height: auto;
+  }
+
+  .filter-card .ant-form-item-control,
+  .filter-card .ant-form-item-control-input,
+  .filter-card .ant-form-item-control-input-content {
+    width: 100%;
+  }
+
+  .filter-card .ant-form-item .ant-select,
+  .filter-card .ant-form-item .ant-input,
+  .filter-card .ant-form-item .ant-input-affix-wrapper {
+    width: 100% !important;
+  }
+}
+
+/* ---------- job form (new task / edit task) ---------- */
+.job-form .ant-form-item {
+  margin-bottom: 12px;
+}
+
+.job-form .ant-form-item-control,
+.job-form .ant-form-item-control-input {
+  min-width: 0;
+}
+
+.job-form .ant-form-item-label {
+  text-align: right;
+}
+
+.job-form .ant-form-item-label > label {
+  color: #333;
+  font-weight: 500;
+}
+
+.job-form-section-title {
+  border-bottom: 1px solid #ebeef5;
+  color: #666;
+  font-size: 13px;
+  font-weight: 600;
+  padding-bottom: 6px;
+  margin: 6px 0 16px;
+}
+
+.job-form-footer {
+  text-align: center;
+}
+
+.job-form-modal .ant-modal-body {
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-top: 8px;
+}
+
+@media (max-width: 767px) {
+  .job-form .ant-form-item-label {
+    text-align: left;
+  }
+
+  .job-form-section-title {
+    margin-top: 12px;
+  }
+
+  .job-form-modal .ant-modal-body {
+    max-height: 72vh;
+  }
+
+  .app-content .ant-table-thead > tr > th,
+  .app-content .ant-table-tbody > tr > td {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+
+  .app-content .ant-table-thead > tr > th {
+    white-space: nowrap;
+  }
+}
+
+/* ---------- cron helper ---------- */
+.cron-input-group {
+  display: flex;
+  width: 100%;
+}
+
+.cron-input-group > .ant-input-affix-wrapper {
+  flex: 1;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+.cron-input-group > .ant-btn {
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.cron-panel {
+  width: 560px;
+  max-width: calc(100vw - 32px);
+  max-height: min(66vh, 560px);
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.cron-panel .ant-tabs-nav {
+  margin-bottom: 10px;
+}
+
+.cron-panel .ant-tabs-tab {
+  padding: 8px 0;
+}
+
+.cron-panel .ant-radio-wrapper {
+  font-size: 13px;
+}
+
+.cron-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 30px;
+}
+
+.cron-text {
+  color: #555;
+  font-size: 13px;
+}
+
+.cron-hint {
+  font-size: 12px;
+  color: #999;
+}
+
+.cron-checkbox-grid {
+  display: grid;
+  grid-template-columns: repeat(10, minmax(0, 1fr));
+  gap: 4px 6px;
+  width: 100%;
+  padding-left: 24px;
+  padding-bottom: 4px;
+}
+
+.cron-checkbox-grid .ant-checkbox-wrapper {
+  margin-inline-start: 0;
+  font-size: 12px;
+}
+
+.cron-checkbox-grid .ant-checkbox-group {
+  display: contents;
+}
+
+.cron-recent {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+  font-size: 13px;
+  min-height: 84px;
+}
+
+.cron-recent .ant-spin-nested-loading,
+.cron-recent .ant-spin-container {
+  min-height: 60px;
+}
+
+.cron-recent-item {
+  color: #555;
+  line-height: 1.9;
+}
+
+.cron-recent-error {
+  color: #ff4d4f;
+  line-height: 1.9;
+  word-break: break-all;
+}
+
+.cron-panel .ant-input-number-input {
+  padding: 0 4px;
+  text-align: center;
+}
+
+@media (max-width: 576px) {
+  .cron-panel {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .cron-checkbox-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    padding-left: 0;
+  }
+
+  .cron-line {
+    gap: 4px;
+  }
+}
+

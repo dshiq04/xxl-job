@@ -36,6 +36,11 @@
 				</div>
 			</div>
 		</form>
+		<div class="login-box-body" style="margin-top: 10px; text-align: center;">
+			<a href="${request.contextPath}/static/new-ui/index.html" class="btn btn-default btn-block btn-flat">
+				<i class="fa fa-desktop"></i> &nbsp;进入新版界面
+			</a>
+		</div>
 	</div>
 <@netCommon.commonScript />
 <script src="${request.contextPath}/static/adminlte/plugins/iCheck/icheck.min.js"></script>

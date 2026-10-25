@@ -30,7 +30,7 @@
 		<spring-boot.version>2.7.18</spring-boot.version>
 
 		<mybatis-spring-boot-starter.version>2.3.2</mybatis-spring-boot-starter.version>
-		<mysql-connector-j.version>8.3.0</mysql-connector-j.version>
+		<postgresql.version>42.7.3</postgresql.version>
 
 		<slf4j-api.version>2.0.13</slf4j-api.version>
 		<junit-jupiter.version>5.10.2</junit-jupiter.version>
@@ -42,6 +42,45 @@
 		<maven-javadoc-plugin.version>3.6.3</maven-javadoc-plugin.version>
 		<maven-gpg-plugin.version>3.2.3</maven-gpg-plugin.version>
 	</properties>
+
+	<!-- Aliyun Maven mirror -->
+	<repositories>
+		<repository>
+			<id>aliyunmaven</id>
+			<name>Aliyun Maven</name>
+			<url>https://maven.aliyun.com/repository/public</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</repository>
+		<repository>
+			<id>aliyun-spring</id>
+			<name>Aliyun Spring</name>
+			<url>https://maven.aliyun.com/repository/spring</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</repository>
+	</repositories>
+	<pluginRepositories>
+		<pluginRepository>
+			<id>aliyun-plugin</id>
+			<name>Aliyun Plugin</name>
+			<url>https://maven.aliyun.com/repository/public</url>
+			<releases>
+				<enabled>true</enabled>
+			</releases>
+			<snapshots>
+				<enabled>false</enabled>
+			</snapshots>
+		</pluginRepository>
+	</pluginRepositories>
 
 	<build>
 		<plugins>
