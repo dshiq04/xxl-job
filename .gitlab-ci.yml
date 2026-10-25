@@ -117,39 +117,3 @@ deploy-admin:
       }
 
       start_app "$ADMIN_IMAGE:latest"
-
-    # 4) 健康检查，失败自动回滚到上一版本镜像
-    - |
-      set +e
-      docker image inspect "$CURL_IMAGE" >/dev/null 2>&1 || docker pull "$CURL_IMAGE" >/dev/null 2>&1
-      HAS_CURL=0
-      docker image inspect "$CURL_IMAGE" >/dev/null 2>&1 && HAS_CURL=1
-
-      ok=0
-      for i in $(seq 1 30); do
-        if [ "$HAS_CURL" = "1" ]; then
-          if docker run --rm --network "$DOCKER_NETWORK" "$CURL_IMAGE" -fsS \
-               "http://${CONTAINER_NAME}:${APP_PORT:-8080}/xxl-job-admin/actuator/health" 2>/dev/null \
-               | grep -q '"status":"UP"'; then ok=1; break; fi
-        else
-          if [ "$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null)" = "true" ]; then ok=1; break; fi
-        fi
-        sleep 3
-      done
-
-      if [ "$ok" != "1" ]; then
-        echo ">>> 健康检查失败，容器日志（最后 100 行）:"
-        docker logs --tail 100 "$CONTAINER_NAME" 2>&1 || true
-        if docker image inspect "$ADMIN_IMAGE:previous" >/dev/null 2>&1; then
-          echo ">>> 回滚到 $ADMIN_IMAGE:previous"
-          start_app "$ADMIN_IMAGE:previous"
-        fi
-        exit 1
-      fi
-      echo ">>> 健康检查通过，部署成功"
-
-    # 5) 输出状态并清理悬空镜像
-    - |
-      docker ps --filter "name=${CONTAINER_NAME}" \
-        --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
-      docker image prune -f >/dev/null || true
