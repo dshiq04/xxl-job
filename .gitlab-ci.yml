@@ -65,17 +65,17 @@ deploy-xxl-job:
     - |
       echo ">>> [4/4] run container: ${CONTAINER_NAME}"
       docker run -d \
-        --name "${CONTAINER_NAME}" \
-        --network "${NETWORK_NAME}" \
-        -p "${HOST_PORT}:8080" \
+        --name ${CONTAINER_NAME} \
+        --network ${NETWORK_NAME} \
+        -p ${HOST_PORT}:8080 \
         -e TZ=Asia/Shanghai \
         -e SPRING_PROFILES_ACTIVE=prod \
-        -e DB_HOST="${DB_HOST}" \
-        -e DB_PORT="${DB_PORT}" \
-        -e DB_USERNAME="${DB_USERNAME}" \
-        -e DB_PASSWORD="${DB_PASSWORD}" \
-        -e DB_DATABASE="${DB_DATABASE}" \
-        -e XXL_JOB_ACCESS_TOKEN="${XXL_JOB_ACCESS_TOKEN}" \
+        -e DB_HOST=${DB_HOST} \
+        -e DB_PORT=${DB_PORT} \
+        -e DB_USERNAME=${DB_USERNAME} \
+        -e DB_PASSWORD=${DB_PASSWORD} \
+        -e DB_DATABASE=${DB_DATABASE} \
+        -e XXL_JOB_ACCESS_TOKEN=${XXL_JOB_ACCESS_TOKEN} \
         "${IMAGE_NAME}"
 
     - docker ps --filter "name=${CONTAINER_NAME}" --format "table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}"
