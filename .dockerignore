@@ -1,0 +1,12 @@
+# 根目录 docker build 上下文瘦身（不影响 xxl-job-admin/ 目录作为上下文的旧构建）
+.git
+.gitignore
+.gitlab-ci.yml
+.idea
+*.iml
+.m2
+**/target
+doc
+*.md
+docker-compose.yml
+.logs

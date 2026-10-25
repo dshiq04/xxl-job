@@ -1,12 +1,13 @@
 # XXL-JOB 调度中心 docker-compose 部署文件
-# 由 GitLab CI（.gitlab-ci.yml）构建镜像后发布；也支持本地：
-#   docker compose up -d --build
+# 镜像由 GitLab CI（.gitlab-ci.yml）构建后发布；也支持本地一键构建启动：
+#   docker compose up -d --build      # 多阶段构建，本地无需安装 JDK/Maven
 services:
   xxl-job-admin:
     # 镜像名可由 CI 传入；本地未指定时使用默认 tag
     image: ${XXL_JOB_ADMIN_IMAGE:-xxl-job-admin:latest}
     build:
-      context: ./xxl-job-admin
+      # 根目录 Dockerfile 为多阶段构建（Maven 在容器内打包）
+      context: .
       dockerfile: Dockerfile
     container_name: xxl-job
     restart: unless-stopped

@@ -1,20 +1,21 @@
 # =============================================================================
-# XXL-JOB —— GitLab CI/CD（构建并部署到“本机 Docker”）
+# XXL-JOB —— GitLab CI/CD（同时兼容 shell executor 与 docker executor）
 #
-# 流水线：Maven 打包 -> 构建 xxl-job-admin 镜像 -> docker compose 发布
+# 流程：docker build（多阶段，Maven 在容器内打包）-> docker compose 发布
 #
-# 运行前提（GitLab 与 Runner 都在本机 Docker 中）：
-#   让 Runner 的作业容器能访问宿主机 Docker 守护进程（socket 绑定模式，
-#   不需要 dind，也不需要 privileged）。/etc/gitlab-runner/config.toml：
-#
-#     [[runners]]
-#       executor = "docker"
+# 前置条件（Runner 所在宿主机 / job 容器内都要满足）：
+#   - 有 docker 命令，并且能连到「部署目标」的 Docker 守护进程
+#   - docker executor：config.toml 必须挂载 socket，否则 job 里没有 docker：
 #       [runners.docker]
+#         image = "docker:27-cli"
+#         privileged = false
 #         volumes = ["/var/run/docker.sock:/var/run/docker.sock", "/cache"]
+#   - shell executor：宿主机装 git + docker + compose 插件，
+#     且 runner 用户已加入 docker 组
+#   - 已存在的自定义网络（CI 会自动创建）
 #
-# 可在 GitLab「Settings -> CI/CD -> Variables」中覆盖的变量：
-#   DB_HOST DB_PORT DB_USER DB_PASSWORD DB_DATABASE
-#   SERVER_PORT(宿主机端口, 默认 8077)  DOCKER_NETWORK(默认 dshiq04)
+# 可在 GitLab CI/CD Variables 覆盖：DB_HOST DB_PORT DB_USER DB_PASSWORD
+#   DB_DATABASE SERVER_PORT(默认 8077) DOCKER_NETWORK(默认 dshiq04)
 # =============================================================================
 
 workflow:
@@ -30,9 +31,11 @@ stages:
   - deploy
 
 variables:
-  # Maven 本地仓库落到项目目录，配合 cache 加速
-  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository -Dfile.encoding=UTF-8"
-  # 调度中心镜像名（只在本机使用，不推送镜像仓库）
+  # job 容器内指向宿主机 Docker（shell executor 下该默认值同样正确）
+  DOCKER_HOST: "unix:///var/run/docker.sock"
+  DOCKER_TLS_CERTDIR: ""
+  DOCKER_BUILDKIT: "1"
+  # 调度中心镜像名（本机使用，不推镜像仓库）
   ADMIN_IMAGE: "xxl-job-admin"
   # 与 docker-compose.yml 保持一致的部署参数
   DOCKER_NETWORK: "dshiq04"
@@ -44,34 +47,22 @@ variables:
 default:
   interruptible: true
 
-# ------------------------------------------------------------------ 编译打包 --
-build-admin:
+# ------------------------------------------------------------------ 构建镜像 --
+build-image:
   stage: build
-  image: maven:3.9-eclipse-temurin-21
-  cache:
-    key: maven-repo
-    paths:
-      - .m2/repository
+  # docker executor 下使用该镜像；shell executor 下忽略此配置
+  image: docker:27-cli
   script:
-    - java -version
-    - mvn -B -U -DskipTests clean package
-  artifacts:
-    name: "xxl-job-admin-$CI_COMMIT_SHORT_SHA"
-    expire_in: 1 week
-    paths:
-      - xxl-job-admin/target/*.jar
+    - docker version
+    - docker build --pull -t "$ADMIN_IMAGE:$CI_COMMIT_SHORT_SHA" -t "$ADMIN_IMAGE:latest" .
+    - docker image inspect "$ADMIN_IMAGE:$CI_COMMIT_SHORT_SHA" --format '>>> 镜像构建完成: {{.Id}} ({{.Size}} bytes)'
 
 # ------------------------------------------------------------------ 部署本机 --
 deploy-admin:
   stage: deploy
   image: docker:27-cli
   needs:
-    - job: build-admin
-      artifacts: true
-  variables:
-    # 直接使用宿主机 Docker 守护进程（Runner 已挂载 /var/run/docker.sock）
-    DOCKER_HOST: "unix:///var/run/docker.sock"
-    DOCKER_TLS_CERTDIR: ""
+    - job: build-image
   environment:
     name: local-docker
     url: "http://localhost:${SERVER_PORT}/xxl-job-admin"
@@ -81,9 +72,14 @@ deploy-admin:
     - when: manual
       allow_failure: true
   script:
-    # 0) 工具自检（个别 docker:cli 镜像未内置 compose 插件）
-    - docker version
-    - docker compose version >/dev/null 2>&1 || apk add --no-cache docker-cli-compose
+    # 0) 环境自检（镜像在上一阶段已构建在同一 Docker 守护进程上）
+    - |
+      command -v docker >/dev/null 2>&1 || { echo "job 内没有 docker 命令：docker executor 需挂载 /var/run/docker.sock"; exit 1; }
+      docker info >/dev/null 2>&1 || { echo "无法连接 Docker 守护进程（检查 socket 挂载 / runner 用户 docker 组）"; exit 1; }
+      DC="docker compose"
+      $DC version >/dev/null 2>&1 || DC="docker-compose"
+      $DC version >/dev/null 2>&1 || { echo "未安装 docker compose 插件"; exit 1; }
+      docker image inspect "$ADMIN_IMAGE:latest" >/dev/null 2>&1 || docker build -t "$ADMIN_IMAGE:latest" .
 
     # 1) 确保自定义网络存在（compose 中声明为 external）
     - |
@@ -94,22 +90,24 @@ deploy-admin:
 
     # 2) 备份当前运行镜像，便于失败回滚
     - |
-      if docker image inspect "$ADMIN_IMAGE:latest" >/dev/null 2>&1; then
+      if docker image inspect "$ADMIN_IMAGE:previous" >/dev/null 2>&1; then
+        docker image rm "$ADMIN_IMAGE:previous" >/dev/null 2>&1 || true
+      fi
+      if docker ps --format '{{.Image}}' | grep -qx "$ADMIN_IMAGE:latest"; then
         docker tag "$ADMIN_IMAGE:latest" "$ADMIN_IMAGE:previous"
         echo ">>> 已备份上一版本镜像: $ADMIN_IMAGE:previous"
       fi
 
-    # 3) 构建镜像（jar 由 build-admin 阶段产出到 xxl-job-admin/target/）
-    - docker build --pull -t "$ADMIN_IMAGE:$CI_COMMIT_SHORT_SHA" -t "$ADMIN_IMAGE:latest" ./xxl-job-admin
-
-    # 4) 发布：--no-build 复用刚构建的镜像；--force-recreate 保证新版本生效
+    # 3) 发布：--no-build 复用刚构建的镜像；--force-recreate 保证新版本生效
     - |
       set -e
+      DC="docker compose"
+      $DC version >/dev/null 2>&1 || DC="docker-compose"
       export XXL_JOB_ADMIN_IMAGE="$ADMIN_IMAGE:latest"
       export SERVER_PORT="${SERVER_PORT:-8077}"
-      docker compose up -d --no-build --force-recreate --remove-orphans
+      $DC up -d --no-build --force-recreate --remove-orphans
 
-    # 5) 健康检查（在 compose 网络内访问 actuator），失败自动回滚
+    # 4) 健康检查（compose 网络内访问 actuator），失败自动回滚
     - |
       set +e
       docker image inspect "$CURL_IMAGE" >/dev/null 2>&1 || docker pull "$CURL_IMAGE" >/dev/null 2>&1
@@ -134,13 +132,15 @@ deploy-admin:
         docker logs --tail 100 xxl-job 2>&1 || true
         if docker image inspect "$ADMIN_IMAGE:previous" >/dev/null 2>&1; then
           echo ">>> 回滚到上一版本镜像 $ADMIN_IMAGE:previous"
+          DC="docker compose"
+          $DC version >/dev/null 2>&1 || DC="docker-compose"
           docker tag "$ADMIN_IMAGE:previous" "$ADMIN_IMAGE:latest"
-          docker compose up -d --no-build --force-recreate --remove-orphans
+          $DC up -d --no-build --force-recreate --remove-orphans
         fi
         exit 1
       fi
       echo ">>> 健康检查通过，部署成功"
 
-    # 6) 输出状态并清理悬空镜像
-    - docker compose ps
+    # 5) 输出状态并清理悬空镜像
+    - docker ps --filter "name=xxl-job" --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}'
     - docker image prune -f >/dev/null || true
