@@ -11,7 +11,7 @@
 # xxl-job container/image. It does not create GitLab or GitLab Runner
 # containers again.
 #
-# Recommended: override DB_PASSWORD and XXL_JOB_ACCESS_TOKEN in
+# Recommended: override DB_USER, DB_PASSWORD and XXL_JOB_ACCESS_TOKEN in
 # GitLab > Settings > CI/CD > Variables (masked + protected).
 # -----------------------------------------------------------------------------
 
@@ -28,7 +28,7 @@ variables:
 
   DB_HOST: postgres
   DB_PORT: 5432
-  DB_USERNAME: postgres
+  DB_USER: postgres
   DB_PASSWORD: tomori
   DB_DATABASE: xxl_job_admin
   XXL_JOB_ACCESS_TOKEN: default_token
@@ -72,7 +72,7 @@ deploy-xxl-job:
         -e SPRING_PROFILES_ACTIVE=prod \
         -e DB_HOST=${DB_HOST} \
         -e DB_PORT=${DB_PORT} \
-        -e DB_USERNAME=${DB_USERNAME} \
+        -e DB_USER=${DB_USER} \
         -e DB_PASSWORD=${DB_PASSWORD} \
         -e DB_DATABASE=${DB_DATABASE} \
         -e XXL_JOB_ACCESS_TOKEN=${XXL_JOB_ACCESS_TOKEN} \

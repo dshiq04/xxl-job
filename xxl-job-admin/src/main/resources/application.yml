@@ -17,7 +17,7 @@ spring:
   application:
     name: xxl-job-admin
   profiles:
-    active: dev
+    active: ${SPRING_PROFILES_ACTIVE:dev}
 
   ### resources
   mvc:
