@@ -1,26 +1,38 @@
-# docker-compose version
-version: '3.8'
+# XXL-JOB 调度中心 docker-compose 部署文件
+# 由 GitLab CI（.gitlab-ci.yml）构建镜像后发布；也支持本地：
+#   docker compose up -d --build
 services:
   xxl-job-admin:
-    # 4、调度中心本地Build设置，如果期望使用推动DockerHub的镜像，可以注释当前启用的image、build配置，并启用如下设置版本的image配置；
+    # 镜像名可由 CI 传入；本地未指定时使用默认 tag
+    image: ${XXL_JOB_ADMIN_IMAGE:-xxl-job-admin:latest}
     build:
       context: ./xxl-job-admin
       dockerfile: Dockerfile
     container_name: xxl-job
+    restart: unless-stopped
     environment:
-      # 5、数据库密码设置，需要与application-prod中保持一致：
       - TZ=Asia/Shanghai
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USER=postgres
-      - DB_PASSWORD=tomori
-      - DB_DATABASE=xxl_job
+      # 数据库连接：application-prod.yml 读取以下环境变量
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-tomori}
+      - DB_DATABASE=${DB_DATABASE:-xxl_job}
+      # Dockerfile 支持 JAVA_OPTS / LOG_HOME
+      - JAVA_OPTS=-Xms256m -Xmx512m
+      - LOG_HOME=/data/applogs
     ports:
-      - "8077:8080"
+      - "${SERVER_PORT:-8077}:8080"
+    volumes:
+      - xxl-job-logs:/data/applogs
     # 加入自定义网络
     networks:
       - dshiq04
-# 加入自定义网络
+
+volumes:
+  xxl-job-logs:
+
+# 加入自定义网络（需已存在：docker network create dshiq04）
 networks:
   dshiq04:
     external: true

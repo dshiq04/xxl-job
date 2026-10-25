@@ -1,0 +1,14 @@
+[pi-web-ui] following a newer pi SDK on this machine: C:\Users\dshiq04\.pi\agent\npm\node_modules\@earendil-works\pi-coding-agent\package.json (v1.3.0; set PI_WEB_SDK=bundled to pin the bundled copy)
+[mcp] 目录监视不可用，mcp.json 热加载回落到 2000ms 轮询
+(node:21388) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+  control    : \\.\pipe\pi-web-ui-8787
+
+  ⚡ pi-web-ui — web chat for the pi coding agent
+    http://localhost:8787
+    workspace   : F:\xxl-job
+    session dir : C:\Users\dshiq04\.pi\agent\sessions
+    pi SDK      : v1.3.0
+    bind        : 127.0.0.1:8787
+
+[catalog] 插件市场列表预同步完成（共 0 个条目，按需安装）

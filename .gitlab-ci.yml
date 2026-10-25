@@ -1,0 +1,146 @@
+# =============================================================================
+# XXL-JOB —— GitLab CI/CD（构建并部署到“本机 Docker”）
+#
+# 流水线：Maven 打包 -> 构建 xxl-job-admin 镜像 -> docker compose 发布
+#
+# 运行前提（GitLab 与 Runner 都在本机 Docker 中）：
+#   让 Runner 的作业容器能访问宿主机 Docker 守护进程（socket 绑定模式，
+#   不需要 dind，也不需要 privileged）。/etc/gitlab-runner/config.toml：
+#
+#     [[runners]]
+#       executor = "docker"
+#       [runners.docker]
+#         volumes = ["/var/run/docker.sock:/var/run/docker.sock", "/cache"]
+#
+# 可在 GitLab「Settings -> CI/CD -> Variables」中覆盖的变量：
+#   DB_HOST DB_PORT DB_USER DB_PASSWORD DB_DATABASE
+#   SERVER_PORT(宿主机端口, 默认 8077)  DOCKER_NETWORK(默认 dshiq04)
+# =============================================================================
+
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    - if: '$CI_COMMIT_BRANCH'
+
+stages:
+  - build
+  - deploy
+
+variables:
+  # Maven 本地仓库落到项目目录，配合 cache 加速
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository -Dfile.encoding=UTF-8"
+  # 调度中心镜像名（只在本机使用，不推送镜像仓库）
+  ADMIN_IMAGE: "xxl-job-admin"
+  # 与 docker-compose.yml 保持一致的部署参数
+  DOCKER_NETWORK: "dshiq04"
+  SERVER_PORT: "8077"
+  COMPOSE_PROJECT_NAME: "xxl-job"
+  # 健康检查用的临时容器
+  CURL_IMAGE: "curlimages/curl:8.10.1"
+
+default:
+  interruptible: true
+
+# ------------------------------------------------------------------ 编译打包 --
+build-admin:
+  stage: build
+  image: maven:3.9-eclipse-temurin-21
+  cache:
+    key: maven-repo
+    paths:
+      - .m2/repository
+  script:
+    - java -version
+    - mvn -B -U -DskipTests clean package
+  artifacts:
+    name: "xxl-job-admin-$CI_COMMIT_SHORT_SHA"
+    expire_in: 1 week
+    paths:
+      - xxl-job-admin/target/*.jar
+
+# ------------------------------------------------------------------ 部署本机 --
+deploy-admin:
+  stage: deploy
+  image: docker:27-cli
+  needs:
+    - job: build-admin
+      artifacts: true
+  variables:
+    # 直接使用宿主机 Docker 守护进程（Runner 已挂载 /var/run/docker.sock）
+    DOCKER_HOST: "unix:///var/run/docker.sock"
+    DOCKER_TLS_CERTDIR: ""
+  environment:
+    name: local-docker
+    url: "http://localhost:${SERVER_PORT}/xxl-job-admin"
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+    - when: manual
+      allow_failure: true
+  script:
+    # 0) 工具自检（个别 docker:cli 镜像未内置 compose 插件）
+    - docker version
+    - docker compose version >/dev/null 2>&1 || apk add --no-cache docker-cli-compose
+
+    # 1) 确保自定义网络存在（compose 中声明为 external）
+    - |
+      if ! docker network inspect "$DOCKER_NETWORK" >/dev/null 2>&1; then
+        echo ">>> 创建 docker 网络: $DOCKER_NETWORK"
+        docker network create "$DOCKER_NETWORK"
+      fi
+
+    # 2) 备份当前运行镜像，便于失败回滚
+    - |
+      if docker image inspect "$ADMIN_IMAGE:latest" >/dev/null 2>&1; then
+        docker tag "$ADMIN_IMAGE:latest" "$ADMIN_IMAGE:previous"
+        echo ">>> 已备份上一版本镜像: $ADMIN_IMAGE:previous"
+      fi
+
+    # 3) 构建镜像（jar 由 build-admin 阶段产出到 xxl-job-admin/target/）
+    - docker build --pull -t "$ADMIN_IMAGE:$CI_COMMIT_SHORT_SHA" -t "$ADMIN_IMAGE:latest" ./xxl-job-admin
+
+    # 4) 发布：--no-build 复用刚构建的镜像；--force-recreate 保证新版本生效
+    - |
+      set -e
+      export XXL_JOB_ADMIN_IMAGE="$ADMIN_IMAGE:latest"
+      export SERVER_PORT="${SERVER_PORT:-8077}"
+      docker compose up -d --no-build --force-recreate --remove-orphans
+
+    # 5) 健康检查（在 compose 网络内访问 actuator），失败自动回滚
+    - |
+      set +e
+      docker image inspect "$CURL_IMAGE" >/dev/null 2>&1 || docker pull "$CURL_IMAGE" >/dev/null 2>&1
+      HAS_CURL=0
+      docker image inspect "$CURL_IMAGE" >/dev/null 2>&1 && HAS_CURL=1
+
+      ok=0
+      for i in $(seq 1 30); do
+        if [ "$HAS_CURL" = "1" ]; then
+          if docker run --rm --network "$DOCKER_NETWORK" "$CURL_IMAGE" -fsS \
+               "http://xxl-job:8080/xxl-job-admin/actuator/health" 2>/dev/null \
+               | grep -q '"status":"UP"'; then ok=1; break; fi
+        else
+          # 无法拉取 curl 镜像时降级为容器运行状态检查
+          if [ "$(docker inspect -f '{{.State.Running}}' xxl-job 2>/dev/null)" = "true" ]; then ok=1; break; fi
+        fi
+        sleep 3
+      done
+
+      if [ "$ok" != "1" ]; then
+        echo ">>> 健康检查失败，容器日志如下（最后 100 行）："
+        docker logs --tail 100 xxl-job 2>&1 || true
+        if docker image inspect "$ADMIN_IMAGE:previous" >/dev/null 2>&1; then
+          echo ">>> 回滚到上一版本镜像 $ADMIN_IMAGE:previous"
+          docker tag "$ADMIN_IMAGE:previous" "$ADMIN_IMAGE:latest"
+          docker compose up -d --no-build --force-recreate --remove-orphans
+        fi
+        exit 1
+      fi
+      echo ">>> 健康检查通过，部署成功"
+
+    # 6) 输出状态并清理悬空镜像
+    - docker compose ps
+    - docker image prune -f >/dev/null || true

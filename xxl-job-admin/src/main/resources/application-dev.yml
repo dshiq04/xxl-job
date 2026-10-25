@@ -1,7 +1,7 @@
 xxl-job:
   database:
     type: postgresql
-    host: 127.0.0.1
+    host: 192.168.150.10
     port: 5432
     username: postgres
     password: tomori
