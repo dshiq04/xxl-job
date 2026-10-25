@@ -55,7 +55,9 @@ build-image:
   script:
     - docker version
     - docker build --pull -t "$ADMIN_IMAGE:$CI_COMMIT_SHORT_SHA" -t "$ADMIN_IMAGE:latest" .
-    - docker image inspect "$ADMIN_IMAGE:$CI_COMMIT_SHORT_SHA" --format '>>> 镜像构建完成: {{.Id}} ({{.Size}} bytes)'
+    - |
+      docker image inspect "$ADMIN_IMAGE:$CI_COMMIT_SHORT_SHA" \
+        --format '>>> 镜像构建完成 {{.Id}} size={{.Size}}'
 
 # ------------------------------------------------------------------ 部署本机 --
 deploy-admin:
