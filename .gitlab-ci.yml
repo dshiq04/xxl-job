@@ -2,6 +2,7 @@
 # XXL-JOB —— GitLab CI/CD（纯 docker 命令，不依赖 docker compose）
 #
 # 流程：docker build（多阶段构建，Maven 在镜像内打包）-> docker run 发布
+# 产物：仅一个镜像 xxl-job:latest（不再额外打 commit SHA / previous 等 tag）
 #
 # 前置条件：
 #   - Runner 为 docker executor，且已挂载 /var/run/docker.sock：
@@ -34,16 +35,14 @@ variables:
   DOCKER_HOST: "unix:///var/run/docker.sock"
   DOCKER_TLS_CERTDIR: ""
   DOCKER_BUILDKIT: "1"
-  # 镜像 / 容器 / 网络
-  ADMIN_IMAGE: "xxl-job-admin"
+  # 镜像名固定为 xxl-job，仅使用 latest 一个 tag
+  ADMIN_IMAGE: "xxl-job"
   CONTAINER_NAME: "xxl-job"
   DOCKER_NETWORK: "dshiq04"
   LOG_VOLUME: "xxl-job-logs"
   # 端口：宿主机端口 -> 容器内端口
   SERVER_PORT: "8077"
   APP_PORT: "8080"
-  # 健康检查用的临时容器
-  CURL_IMAGE: "curlimages/curl:8.10.1"
 
 default:
   interruptible: true
@@ -54,10 +53,19 @@ build-image:
   image: docker:27-cli
   script:
     - docker version
-    - docker build --pull -t "$ADMIN_IMAGE:$CI_COMMIT_SHORT_SHA" -t "$ADMIN_IMAGE:latest" .
+    # 只构建并打一个 tag：xxl-job:latest
+    - docker build --pull -t "$ADMIN_IMAGE:latest" .
     - |
-      docker image inspect "$ADMIN_IMAGE:$CI_COMMIT_SHORT_SHA" \
+      docker image inspect "$ADMIN_IMAGE:latest" \
         --format '>>> 镜像构建完成 {{.Id}} size={{.Size}}'
+    # 清理历史遗留镜像（xxl-job-admin:* 以及 xxl-job 的非 latest tag）
+    # 最终磁盘上只保留一个 xxl-job:latest
+    - |
+      docker images --format '{{.Repository}}:{{.Tag}}' \
+        | grep -E '^xxl-job-admin:' | xargs -r docker rmi >/dev/null 2>&1 || true
+      docker images --format '{{.Repository}}:{{.Tag}}' \
+        | grep -E '^xxl-job:' | grep -v '^xxl-job:latest$' \
+        | xargs -r docker rmi >/dev/null 2>&1 || true
 
 # ------------------------------------------------------------------ 发布容器 --
 deploy-admin:
@@ -74,7 +82,7 @@ deploy-admin:
     - when: manual
       allow_failure: true
   script:
-    # 0) 环境自检
+    # 0) 环境自检（镜像存在则直接复用，因为整个流水线只产出 xxl-job:latest）
     - |
       command -v docker >/dev/null 2>&1 || { echo "job 内没有 docker 命令：docker executor 需挂载 /var/run/docker.sock"; exit 1; }
       docker info >/dev/null 2>&1 || { echo "无法连接 Docker 守护进程"; exit 1; }
@@ -87,33 +95,21 @@ deploy-admin:
         docker network create "$DOCKER_NETWORK" >/dev/null
       fi
 
-    # 2) 备份当前版本镜像用于回滚
+    # 2) 启动容器（镜像统一使用 xxl-job:latest）
     - |
-      docker image rm "$ADMIN_IMAGE:previous" >/dev/null 2>&1 || true
-      if docker image inspect "$ADMIN_IMAGE:latest" >/dev/null 2>&1; then
-        docker tag "$ADMIN_IMAGE:latest" "$ADMIN_IMAGE:previous"
-        echo ">>> 已备份上一版本: $ADMIN_IMAGE:previous"
-      fi
-
-    # 3) 启动容器（函数封装，回滚时复用同一套参数）
-    - |
-      start_app() {
-        docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
-        docker run -d --name "$CONTAINER_NAME" \
-          --restart unless-stopped \
-          --network "$DOCKER_NETWORK" \
-          -e TZ=Asia/Shanghai \
-          -e DB_HOST="${DB_HOST:-postgres}" \
-          -e DB_PORT="${DB_PORT:-5432}" \
-          -e DB_USER="${DB_USER:-postgres}" \
-          -e DB_PASSWORD="${DB_PASSWORD:-tomori}" \
-          -e DB_DATABASE="${DB_DATABASE:-xxl_job}" \
-          -e JAVA_OPTS="${JAVA_OPTS:--Xms256m -Xmx512m}" \
-          -e LOG_HOME=/data/applogs \
-          -p "${SERVER_PORT:-8077}:${APP_PORT:-8080}" \
-          -v "${LOG_VOLUME}:/data/applogs" \
-          "$1" >/dev/null
-        echo ">>> 容器已启动: $CONTAINER_NAME 镜像=$1 端口=${SERVER_PORT:-8077}"
-      }
-
-      start_app "$ADMIN_IMAGE:latest"
+      docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+      docker run -d --name "$CONTAINER_NAME" \
+        --restart unless-stopped \
+        --network "$DOCKER_NETWORK" \
+        -e TZ=Asia/Shanghai \
+        -e DB_HOST="${DB_HOST:-postgres}" \
+        -e DB_PORT="${DB_PORT:-5432}" \
+        -e DB_USER="${DB_USER:-postgres}" \
+        -e DB_PASSWORD="${DB_PASSWORD:-tomori}" \
+        -e DB_DATABASE="${DB_DATABASE:-xxl_job}" \
+        -e JAVA_OPTS="${JAVA_OPTS:--Xms256m -Xmx512m}" \
+        -e LOG_HOME=/data/applogs \
+        -p "${SERVER_PORT:-8077}:${APP_PORT:-8080}" \
+        -v "${LOG_VOLUME}:/data/applogs" \
+        "$ADMIN_IMAGE:latest" >/dev/null
+      echo ">>> 容器已启动: $CONTAINER_NAME 镜像=$ADMIN_IMAGE:latest 端口=${SERVER_PORT:-8077}"

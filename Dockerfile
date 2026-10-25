@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.7
 # =============================================================================
 # XXL-JOB 多阶段构建（执行器无关：CI 里只需 docker build，无需宿主机 JDK/Maven）
-# 构建：docker build -t xxl-job-admin:latest .
-# 说明：xxl-job-admin/Dockerfile 为旧版（要求预先 mvn package 出 jar），仍然保留
+# 构建：docker build -t xxl-job:latest .
+# 该 Dockerfile 是唯一构建入口，产物镜像名为 xxl-job:latest
 # =============================================================================
 
 # ---------------------------------------------------------------- 构建阶段 ----

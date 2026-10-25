@@ -1,3 +1,5 @@
+# 旧版 Dockerfile（要求预先 mvn package 出 jar），一般请使用根目录多阶段构建的 Dockerfile
+# 构建：docker build -t xxl-job:latest -f xxl-job-admin/Dockerfile xxl-job-admin
 # base image
 FROM eclipse-temurin:21-jre-jammy
 
